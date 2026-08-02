@@ -7,7 +7,6 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
     try {
-        // Razorpay Signature
         const signature = req.headers["x-razorpay-signature"];
 
         if (!signature) {
@@ -17,11 +16,11 @@ router.post("/", async (req, res) => {
             });
         }
 
-        // Verify Webhook Signature
+        // Always verify signature in production
         const isValid = verifySignature(req.body, signature);
 
         if (!isValid) {
-            console.error("❌ Invalid Razorpay Signature");
+            console.error(`[${new Date().toISOString()}] Invalid Razorpay Signature`);
 
             return res.status(401).json({
                 success: false,
@@ -29,15 +28,24 @@ router.post("/", async (req, res) => {
             });
         }
 
-        // Parse Raw Body
-        const payload = JSON.parse(req.body.toString("utf8"));
+        let payload;
 
-        console.log("✅ Razorpay Webhook Verified");
+        try {
+            payload = JSON.parse(req.body.toString("utf8"));
+        } catch (err) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid JSON payload."
+            });
+        }
 
-        // Only process successful payments
+        console.log("======================================");
+        console.log(`[${new Date().toISOString()}] Razorpay Webhook`);
+        console.log(`Event : ${payload.event}`);
+        console.log("======================================");
+
+        // Ignore all other events
         if (payload.event !== "payment.captured") {
-            console.log(`Ignoring event: ${payload.event}`);
-
             return res.status(200).json({
                 success: true,
                 message: "Event ignored."
@@ -53,72 +61,89 @@ router.post("/", async (req, res) => {
             });
         }
 
-        // Required fields
+        if (payment.status !== "captured") {
+            return res.status(200).json({
+                success: true,
+                message: "Payment not captured."
+            });
+        }
+
         if (!payment.id) {
             return res.status(400).json({
                 success: false,
-                message: "Missing payment ID."
+                message: "Payment ID missing."
             });
         }
 
         if (!payment.email) {
             return res.status(400).json({
                 success: false,
-                message: "Customer email is required."
+                message: "Customer email missing."
             });
         }
 
-        // Customer object for Shopify
         const customer = {
-            name:
-                payment.name ||
-                payment.notes?.name ||
-                "",
-
+            name: payment.name || payment.notes?.name || "",
             email: payment.email,
-
             phone: payment.contact || "",
-
             amount: payment.amount / 100,
-
-            currency: payment.currency,
-
+            currency: payment.currency || "INR",
             paymentId: payment.id,
-
             orderId: payment.order_id || ""
         };
 
         console.log("======================================");
-        console.log("💳 Payment Captured");
+        console.log("Payment Captured");
         console.log(`Payment ID : ${customer.paymentId}`);
         console.log(`Order ID   : ${customer.orderId}`);
-        console.log(`Name       : ${customer.name}`);
         console.log(`Email      : ${customer.email}`);
-        console.log(`Phone      : ${customer.phone}`);
         console.log(`Amount     : ₹${customer.amount}`);
         console.log("======================================");
 
-        const order = await createShopifyOrder(customer);
+        let order;
 
-        console.log(
-            `✅ Shopify Order Created (#${order.order_number || order.name})`
-        );
+        try {
+            order = await createShopifyOrder(customer);
+        } catch (err) {
+
+            // Duplicate webhook should still return 200
+            if (
+                err.message &&
+                err.message.toLowerCase().includes("duplicate")
+            ) {
+                console.log("Duplicate webhook ignored.");
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Duplicate webhook ignored."
+                });
+            }
+
+            throw err;
+        }
+
+        console.log("======================================");
+        console.log("Shopify Order Created");
+        console.log(`Shopify ID : ${order.id}`);
+        console.log(`Order Name : ${order.name}`);
+        console.log("======================================");
 
         return res.status(200).json({
             success: true,
-            message: "Shopify order created successfully.",
             orderId: order.id,
             orderName: order.name
         });
+
     } catch (error) {
+
         console.error("======================================");
-        console.error("❌ Webhook Error");
-        console.error(error.response?.data || error.message);
+        console.error("Webhook Processing Failed");
+        console.error(error.response?.data || error.stack || error.message);
         console.error("======================================");
 
         return res.status(500).json({
             success: false,
-            message: "Internal Server Error"
+            message: "Webhook processing failed."
         });
     }
 });

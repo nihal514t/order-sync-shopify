@@ -1,33 +1,42 @@
 const axios = require("axios");
+const { getAccessToken } = require("./auth");
 
-const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
-const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP;
 const SHOPIFY_API_VERSION =
     process.env.SHOPIFY_API_VERSION || "2025-10";
 
 const SHOPIFY_VARIANT_ID = Number(process.env.SHOPIFY_VARIANT_ID);
 
-const api = axios.create({
-    baseURL: `https://${SHOPIFY_STORE}/admin/api/${SHOPIFY_API_VERSION}`,
-    headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
-    }
-});
+async function api() {
+    const token = await getAccessToken();
+
+    return axios.create({
+        baseURL: `https://${SHOPIFY_SHOP}.myshopify.com/admin/api/${SHOPIFY_API_VERSION}`,
+        headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": token
+        }
+    });
+}
 
 function validateConfig() {
-    if (!SHOPIFY_STORE)
-        throw new Error("SHOPIFY_STORE is missing.");
+    if (!SHOPIFY_SHOP)
+        throw new Error("SHOPIFY_SHOP is missing.");
 
-    if (!SHOPIFY_ACCESS_TOKEN)
-        throw new Error("SHOPIFY_ACCESS_TOKEN is missing.");
+    if (!process.env.SHOPIFY_CLIENT_ID)
+        throw new Error("SHOPIFY_CLIENT_ID is missing.");
+
+    if (!process.env.SHOPIFY_CLIENT_SECRET)
+        throw new Error("SHOPIFY_CLIENT_SECRET is missing.");
 
     if (!SHOPIFY_VARIANT_ID)
         throw new Error("SHOPIFY_VARIANT_ID is missing.");
 }
 
 async function findCustomerByEmail(email) {
-    const response = await api.get("/customers/search.json", {
+    const client = await api();
+
+    const response = await client.get("/customers/search.json", {
         params: {
             query: `email:${email}`
         }
@@ -41,7 +50,9 @@ async function findCustomerByEmail(email) {
 }
 
 async function createCustomer(customer) {
-    const response = await api.post("/customers.json", {
+    const client = await api();
+
+    const response = await client.post("/customers.json", {
         customer: {
             first_name: customer.name,
             email: customer.email,
@@ -72,7 +83,9 @@ async function getOrCreateCustomer(customer) {
 }
 
 async function findOrderByPaymentId(paymentId) {
-    const response = await api.get("/orders.json", {
+    const client = await api();
+
+    const response = await client.get("/orders.json", {
         params: {
             status: "any",
             limit: 250
@@ -92,7 +105,9 @@ async function findOrderByPaymentId(paymentId) {
 }
 
 async function createOrder(customer, shopifyCustomerId) {
-    const response = await api.post("/orders.json", {
+    const client = await api();
+
+    const response = await client.post("/orders.json", {
         order: {
             customer: {
                 id: shopifyCustomerId
@@ -164,8 +179,7 @@ async function createShopifyOrder(customer) {
         return existingOrder;
     }
 
-    const shopifyCustomer =
-        await getOrCreateCustomer(customer);
+    const shopifyCustomer = await getOrCreateCustomer(customer);
 
     const order = await createOrder(
         customer,
