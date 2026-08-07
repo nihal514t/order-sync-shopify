@@ -1,6 +1,8 @@
 const axios = require("axios");
 const { getAccessToken } = require("./auth");
 
+const { appendToGoogleSheet } = require("./googleSheetsService");
+
 const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP;
 const SHOPIFY_API_VERSION =
     process.env.SHOPIFY_API_VERSION || "2025-10";
@@ -205,6 +207,8 @@ async function createShopifyOrder(customer) {
     console.log(
         `Shopify Order Created (#${order.order_number})`
     );
+
+    await appendToGoogleSheet(order);
 
     return order;
 }
