@@ -2,6 +2,7 @@ const { google } = require("googleapis");
 
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 
+// Fix escaped newlines in private key
 credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
 const auth = new google.auth.GoogleAuth({
@@ -20,14 +21,12 @@ const PRODUCT_MAP = {
     249: {
         spreadsheetId: process.env.QUALITY_SPREADSHEET_ID,
         sheetName: "DAILY",
-        column: "B",
         value: 243.12
     },
 
     49: {
         spreadsheetId: process.env.FML_SPREADSHEET_ID,
         sheetName: "DAILY",
-        column: "B",
         value: 47.84
     }
 };
@@ -45,14 +44,25 @@ async function appendToGoogleSheet(order) {
             );
         }
 
-        await sheets.spreadsheets.values.append({
+        // Format: dd/MM/yyyy HH:mm:ss
+        const now = new Date();
+
+        const date =
+            now.toLocaleDateString("en-GB") +
+            " " +
+            now.toLocaleTimeString("en-GB", {
+                hour12: false
+            });
+
+        const response = await sheets.spreadsheets.values.append({
             spreadsheetId: config.spreadsheetId,
-            range: `${config.sheetName}!${config.column}:${config.column}`,
+            range: `${config.sheetName}!A:B`,
             valueInputOption: "USER_ENTERED",
             insertDataOption: "INSERT_ROWS",
             requestBody: {
                 values: [
                     [
+                        date,
                         config.value
                     ]
                 ]
@@ -64,6 +74,7 @@ async function appendToGoogleSheet(order) {
         console.log(`Amount      : ₹${orderPrice}`);
         console.log(`Value       : ${config.value}`);
         console.log(`Spreadsheet : ${config.spreadsheetId}`);
+        console.log(`Updated     : ${response.data.updates.updatedRange}`);
         console.log("--------------------------------");
 
     } catch (error) {
