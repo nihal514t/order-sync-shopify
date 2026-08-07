@@ -5,7 +5,10 @@ const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP;
 const SHOPIFY_API_VERSION =
     process.env.SHOPIFY_API_VERSION || "2025-10";
 
-const SHOPIFY_VARIANT_ID = Number(process.env.SHOPIFY_VARIANT_ID);
+const VARIANT_MAP = {
+    249: Number(process.env.QUALITY_PACK_VARIANT_ID),
+    49: Number(process.env.FML_FONT_PACK_VARIANT_ID)
+};
 
 async function api() {
     const token = await getAccessToken();
@@ -29,8 +32,11 @@ function validateConfig() {
     if (!process.env.SHOPIFY_CLIENT_SECRET)
         throw new Error("SHOPIFY_CLIENT_SECRET is missing.");
 
-    if (!SHOPIFY_VARIANT_ID)
-        throw new Error("SHOPIFY_VARIANT_ID is missing.");
+    if (!process.env.QUALITY_PACK_VARIANT_ID)
+        throw new Error("QUALITY_PACK_VARIANT_ID is missing.");
+
+    if (!process.env.FML_FONT_PACK_VARIANT_ID)
+        throw new Error("FML_FONT_PACK_VARIANT_ID is missing.");
 }
 
 async function findCustomerByEmail(email) {
@@ -104,7 +110,7 @@ async function findOrderByPaymentId(paymentId) {
     return order || null;
 }
 
-async function createOrder(customer, shopifyCustomerId) {
+async function createOrder(customer, shopifyCustomerId, variantId) {
     const client = await api();
 
     const response = await client.post("/orders.json", {
@@ -142,7 +148,7 @@ async function createOrder(customer, shopifyCustomerId) {
 
             line_items: [
                 {
-                    variant_id: SHOPIFY_VARIANT_ID,
+                    variant_id: variantId,
                     quantity: 1
                 }
             ]
@@ -166,6 +172,7 @@ async function createShopifyOrder(customer) {
     console.log("--------------------------------");
     console.log(`Email      : ${customer.email}`);
     console.log(`Payment ID : ${customer.paymentId}`);
+    console.log(`Amount     : ₹${customer.amount}`);
 
     const existingOrder = await findOrderByPaymentId(
         customer.paymentId
@@ -179,11 +186,20 @@ async function createShopifyOrder(customer) {
         return existingOrder;
     }
 
+    const variantId = VARIANT_MAP[customer.amount];
+
+    if (!variantId) {
+        throw new Error(
+            `No Shopify variant configured for amount ₹${customer.amount}`
+        );
+    }
+
     const shopifyCustomer = await getOrCreateCustomer(customer);
 
     const order = await createOrder(
         customer,
-        shopifyCustomer.id
+        shopifyCustomer.id,
+        variantId
     );
 
     console.log(
