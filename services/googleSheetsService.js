@@ -48,8 +48,8 @@ async function appendToGoogleSheet(order) {
         const now = new Date();
 
         const date =
-            now.toLocaleDateString("en-GB") +
-            " " +
+             now.toLocaleDateString("en-GB") +
+             " " +
             now.toLocaleTimeString("en-GB", {
                 hour12: false
             });
