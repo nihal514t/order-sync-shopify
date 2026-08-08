@@ -2,12 +2,14 @@ const express = require("express");
 
 const verifySignature = require("../utils/verifySignature");
 const createShopifyOrder = require("../services/shopify");
+const { sendPurchaseEvent } = require("../services/meta");
 
 const router = express.Router();
 
 router.post("/", async (req, res) => {
     try {
-        const signature = req.headers["x-razorpay-signature"];
+        const signature =
+            req.headers["x-razorpay-signature"];
 
         if (!signature) {
             return res.status(400).json({
@@ -16,11 +18,13 @@ router.post("/", async (req, res) => {
             });
         }
 
-        // Always verify signature in production
-        const isValid = verifySignature(req.body, signature);
+        const isValid =
+            verifySignature(req.body, signature);
 
         if (!isValid) {
-            console.error(`[${new Date().toISOString()}] Invalid Razorpay Signature`);
+            console.error(
+                `[${new Date().toISOString()}] Invalid Razorpay Signature`
+            );
 
             return res.status(401).json({
                 success: false,
@@ -31,7 +35,10 @@ router.post("/", async (req, res) => {
         let payload;
 
         try {
-            payload = JSON.parse(req.body.toString("utf8"));
+            payload =
+                JSON.parse(
+                    req.body.toString("utf8")
+                );
         } catch (err) {
             return res.status(400).json({
                 success: false,
@@ -40,11 +47,12 @@ router.post("/", async (req, res) => {
         }
 
         console.log("======================================");
-        console.log(`[${new Date().toISOString()}] Razorpay Webhook`);
+        console.log(
+            `[${new Date().toISOString()}] Razorpay Webhook`
+        );
         console.log(`Event : ${payload.event}`);
         console.log("======================================");
 
-        // Ignore all other events
         if (payload.event !== "payment.captured") {
             return res.status(200).json({
                 success: true,
@@ -52,7 +60,8 @@ router.post("/", async (req, res) => {
             });
         }
 
-        const payment = payload.payload?.payment?.entity;
+        const payment =
+            payload.payload?.payment?.entity;
 
         if (!payment) {
             return res.status(400).json({
@@ -83,50 +92,102 @@ router.post("/", async (req, res) => {
         }
 
         const customer = {
-            name: payment.name || payment.notes?.name || "",
-            email: payment.email,
-            phone: payment.contact || "",
-            amount: payment.amount / 100,
-            currency: payment.currency || "INR",
-            paymentId: payment.id,
-            orderId: payment.order_id || ""
+            name:
+                payment.name ||
+                payment.notes?.name ||
+                "",
+
+            email:
+                payment.email,
+
+            phone:
+                payment.contact ||
+                "",
+
+            amount:
+                payment.amount / 100,
+
+            currency:
+                payment.currency ||
+                "INR",
+
+            paymentId:
+                payment.id,
+
+            orderId:
+                payment.order_id ||
+                ""
         };
 
         console.log("======================================");
         console.log("Payment Captured");
-        console.log(`Payment ID : ${customer.paymentId}`);
-        console.log(`Order ID   : ${customer.orderId}`);
-        console.log(`Email      : ${customer.email}`);
-        console.log(`Amount     : ₹${customer.amount}`);
+        console.log(
+            `Payment ID : ${customer.paymentId}`
+        );
+        console.log(
+            `Order ID   : ${customer.orderId}`
+        );
+        console.log(
+            `Email      : ${customer.email}`
+        );
+        console.log(
+            `Amount     : ₹${customer.amount}`
+        );
         console.log("======================================");
 
-        let order;
+        const order =
+            await createShopifyOrder(customer);
+
+        console.log("======================================");
+        console.log("Shopify Order Ready");
+        console.log(
+            `Shopify ID : ${order.id}`
+        );
+        console.log(
+            `Order Name : ${order.name}`
+        );
+        console.log("======================================");
 
         try {
-            order = await createShopifyOrder(customer);
-        } catch (err) {
+            await sendPurchaseEvent({
+                paymentId:
+                    customer.paymentId,
 
-            // Duplicate webhook should still return 200
-            if (
-                err.message &&
-                err.message.toLowerCase().includes("duplicate")
-            ) {
-                console.log("Duplicate webhook ignored.");
+                email:
+                    customer.email,
 
-                return res.status(200).json({
-                    success: true,
-                    message: "Duplicate webhook ignored."
-                });
-            }
+                phone:
+                    customer.phone,
 
-            throw err;
+                amount:
+                    customer.amount,
+
+                currency:
+                    customer.currency
+            });
+
+            console.log(
+                "Meta Purchase Event Sent Successfully"
+            );
+
+        } catch (metaError) {
+            console.error("======================================");
+            console.error(
+                "Meta Purchase Event Failed"
+            );
+            console.error(
+                metaError.response?.data ||
+                metaError.stack ||
+                metaError.message
+            );
+            console.error("======================================");
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Meta Purchase event failed."
+            });
         }
-
-        console.log("======================================");
-        console.log("Shopify Order Created");
-        console.log(`Shopify ID : ${order.id}`);
-        console.log(`Order Name : ${order.name}`);
-        console.log("======================================");
 
         return res.status(200).json({
             success: true,
@@ -135,15 +196,21 @@ router.post("/", async (req, res) => {
         });
 
     } catch (error) {
-
         console.error("======================================");
-        console.error("Webhook Processing Failed");
-        console.error(error.response?.data || error.stack || error.message);
+        console.error(
+            "Webhook Processing Failed"
+        );
+        console.error(
+            error.response?.data ||
+            error.stack ||
+            error.message
+        );
         console.error("======================================");
 
         return res.status(500).json({
             success: false,
-            message: "Webhook processing failed."
+            message:
+                "Webhook processing failed."
         });
     }
 });
