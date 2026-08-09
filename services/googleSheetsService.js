@@ -47,12 +47,10 @@ async function appendToGoogleSheet(order) {
         // Format: dd/MM/yyyy HH:mm:ss
         const now = new Date();
 
-        const date =
-             now.toLocaleDateString("en-GB") +
-             " " +
-            now.toLocaleTimeString("en-GB", {
-                hour12: false
-            });
+        const date = now.toLocaleString("en-GB", {
+            timeZone: "Asia/Kolkata",
+            hour12: false
+        });
 
         const response = await sheets.spreadsheets.values.append({
             spreadsheetId: config.spreadsheetId,
