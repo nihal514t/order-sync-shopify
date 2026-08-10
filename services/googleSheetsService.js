@@ -1,9 +1,11 @@
 const { google } = require("googleapis");
 
-const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const credentials = JSON.parse(
+    process.env.GOOGLE_CREDENTIALS
+);
 
-// Fix escaped newlines in private key
-credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+credentials.private_key =
+    credentials.private_key.replace(/\\n/g, "\n");
 
 const auth = new google.auth.GoogleAuth({
     credentials,
@@ -19,22 +21,32 @@ const sheets = google.sheets({
 
 const PRODUCT_MAP = {
     249: {
-        spreadsheetId: process.env.QUALITY_SPREADSHEET_ID,
+        spreadsheetId:
+            process.env.QUALITY_SPREADSHEET_ID,
         sheetName: "DAILY",
         value: 243.12
     },
 
     49: {
-        spreadsheetId: process.env.FML_SPREADSHEET_ID,
+        spreadsheetId:
+            process.env.FML_SPREADSHEET_ID,
         sheetName: "DAILY",
         value: 47.84
+    },
+
+    99: {
+        spreadsheetId:
+            process.env.EDITING_BUNDLE_SPREADSHEET_ID,
+        sheetName: "DAILY",
+        value: 96.66
     }
 };
 
 async function appendToGoogleSheet(order) {
     try {
-
-        const orderPrice = Number(order.current_total_price);
+        const orderPrice = Number(
+            order.current_total_price
+        );
 
         const config = PRODUCT_MAP[orderPrice];
 
@@ -44,7 +56,13 @@ async function appendToGoogleSheet(order) {
             );
         }
 
-        // Format: dd/MM/yyyy HH:mm:ss
+        if (!config.spreadsheetId) {
+            throw new Error(
+                `Spreadsheet ID missing for ₹${orderPrice}`
+            );
+        }
+
+        // India Standard Time
         const now = new Date();
 
         const date = now.toLocaleString("en-GB", {
@@ -52,34 +70,57 @@ async function appendToGoogleSheet(order) {
             hour12: false
         });
 
-        const response = await sheets.spreadsheets.values.append({
-            spreadsheetId: config.spreadsheetId,
-            range: `${config.sheetName}!A:B`,
-            valueInputOption: "USER_ENTERED",
-            insertDataOption: "INSERT_ROWS",
-            requestBody: {
-                values: [
-                    [
-                        date,
-                        config.value
+        const response =
+            await sheets.spreadsheets.values.append({
+                spreadsheetId:
+                    config.spreadsheetId,
+
+                range:
+                    `${config.sheetName}!A:B`,
+
+                valueInputOption:
+                    "USER_ENTERED",
+
+                insertDataOption:
+                    "INSERT_ROWS",
+
+                requestBody: {
+                    values: [
+                        [
+                            date,
+                            config.value
+                        ]
                     ]
-                ]
-            }
-        });
+                }
+            });
 
         console.log("--------------------------------");
         console.log("Google Sheet Updated");
-        console.log(`Amount      : ₹${orderPrice}`);
-        console.log(`Value       : ${config.value}`);
-        console.log(`Spreadsheet : ${config.spreadsheetId}`);
-        console.log(`Updated     : ${response.data.updates.updatedRange}`);
+        console.log(
+            `Amount      : ₹${orderPrice}`
+        );
+        console.log(
+            `Value       : ${config.value}`
+        );
+        console.log(
+            `Spreadsheet : ${config.spreadsheetId}`
+        );
+        console.log(
+            `Updated     : ${response.data.updates.updatedRange}`
+        );
+        console.log(
+            `Date        : ${date}`
+        );
         console.log("--------------------------------");
 
     } catch (error) {
 
         console.error("--------------------------------");
         console.error("Google Sheets Error");
-        console.error(error.response?.data || error.message);
+        console.error(
+            error.response?.data ||
+            error.message
+        );
         console.error("--------------------------------");
 
         throw error;
