@@ -1,3 +1,4 @@
 node_modules
 .env
 getVariants.js
+get-store2-variant.js
