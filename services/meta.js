@@ -297,6 +297,8 @@ async function sendPurchaseEvent(payment) {
         const response =
             await eventRequest.execute();
 
+        console.log("Meta API Response:",JSON.stringify(response, null, 2));
+
 
         /*
          * -------------------------------------------------
