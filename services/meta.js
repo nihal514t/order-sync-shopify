@@ -17,20 +17,19 @@ const {
 
 const META_CONFIG = {
 
-    CURRENT: {
-        pixelId:
-            process.env.META_PIXEL_ID,
+    QUALITY_PACK: {
+        pixelId: process.env.META_QUALITY_PIXEL_ID,
+        accessToken: process.env.META_QUALITY_ACCESS_TOKEN
+    },
 
-        accessToken:
-            process.env.META_ACCESS_TOKEN
+    FML_FONT_PACK: {
+        pixelId: process.env.META_FML_PIXEL_ID,
+        accessToken: process.env.META_FML_ACCESS_TOKEN
     },
 
     EDITING_BUNDLE: {
-        pixelId:
-            process.env.META_EDITING_PIXEL_ID,
-
-        accessToken:
-            process.env.META_EDITING_ACCESS_TOKEN
+        pixelId: process.env.META_EDITING_PIXEL_ID,
+        accessToken: process.env.META_EDITING_ACCESS_TOKEN
     }
 
 };
@@ -49,14 +48,13 @@ const META_CONFIG = {
 
 const PRODUCT_META_MAP = {
 
-    249: "CURRENT",
+    249: "QUALITY_PACK",
 
-    49: "CURRENT",
+    49: "FML_FONT_PACK",
 
     99: "EDITING_BUNDLE"
 
 };
-
 
 /*
  * =========================================================
